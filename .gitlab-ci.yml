@@ -1,0 +1,103 @@
+image: docker:19.03
+
+services:
+  - docker:19.03-dind
+  - mongo:latest
+
+stages:
+  - build
+  - deploy
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+build-devlop:
+  stage: build
+  timeout: 15m
+  tags:
+    - docker
+    - linux
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" "$CI_REGISTRY" --password-stdin
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:dev .
+    - docker push $CI_REGISTRY_IMAGE:dev
+  only:
+    refs:
+      - develop
+
+build-staging:
+  stage: build
+  timeout: 15m
+  tags:
+    - docker
+    - linux
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" "$CI_REGISTRY" --password-stdin
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:staging .
+    - docker push $CI_REGISTRY_IMAGE:staging
+  only:
+    refs:
+      - /^release*/
+
+build-master:
+  stage: build
+  timeout: 15m
+  tags:
+    - docker
+    - linux
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" "$CI_REGISTRY" --password-stdin
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - master
+
+deploy-staging:
+  stage: deploy
+  timeout: 15m
+  tags:
+    - docker
+    - linux
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo -e "$STAGE_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "HOST *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  script:
+    - echo "Deploying to STAGING"
+    - ssh ubuntu@$STAGE_URL 'aws s3 cp s3://4-0005-cell-config/staging/docker-compose.yml .'
+    - ssh ubuntu@$STAGE_URL 'docker-compose -p stage pull && docker-compose -p stage up -d'
+  environment:
+    name: staging
+    url: http://$STAGE_URL
+  only:
+    refs:
+      - /^release*/
+
+deploy-prod:
+  stage: deploy
+  timeout: 15m
+  tags:
+    - docker
+    - linux
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo -e "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "HOST *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  script:
+    - echo "Deploying to PRODUCTION"
+    - ssh ubuntu@$PROD_URL 'aws s3 cp s3://4-0005-cell-config/prod/docker-compose.yml .'
+    - ssh ubuntu@$PROD_URL 'docker-compose -p prod pull && docker-compose -p prod up -d'
+  environment:
+    name: production
+    url: http://$PROD_URL
+  only:
+    refs:
+      - master

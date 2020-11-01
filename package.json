@@ -1,0 +1,29 @@
+{
+  "name": "2-0009",
+  "version": "0.2.0",
+  "description": "MQTT Broker",
+  "main": "server.js",
+  "scripts": {
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "author": "Robert Carey",
+  "license": "ISC",
+  "dependencies": {
+    "aedes": "^0.42.5",
+    "axios": "^0.20.0",
+    "body-parser": "^1.19.0",
+    "jsonwebtoken": "^8.5.1",
+    "pino": "^5.16.0",
+    "pino-pretty": "^3.6.0",
+    "websocket-stream": "^5.5.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^26.0.10",
+    "jest": "^26.4.0",
+    "node-mocks-http": "^1.9.0",
+    "nodemon": "^2.0.4",
+    "sinon": "^9.0.3",
+    "supertest": "^4.0.2"
+  }
+}
